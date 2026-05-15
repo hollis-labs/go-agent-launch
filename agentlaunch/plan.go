@@ -94,5 +94,10 @@ func (p LaunchPlan) Validate() error {
 			return err
 		}
 	}
+	for i := range p.Injection.NativeFiles {
+		if err := p.Injection.NativeFiles[i].Validate(); err != nil {
+			return err
+		}
+	}
 	return nil
 }
