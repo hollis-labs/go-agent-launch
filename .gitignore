@@ -9,6 +9,10 @@
 coverage.out
 coverage.html
 
+# Built example binaries (top-level binaries left by `go run ./examples/<x>`
+# or `go build -o <x> ./examples/<x>` land at repo root by default).
+/with-context
+
 # Editor scratch
 .idea/
 .vscode/
