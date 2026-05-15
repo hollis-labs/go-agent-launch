@@ -4,6 +4,10 @@ All notable changes to `go-agent-launch` are documented in this file. Per-releas
 
 ## Unreleased
 
+_Nothing yet._
+
+## v0.1.0 — 2026-05-15
+
 Initial scaffold. See sprint `SP-20260514-0003`.
 
 ### Added — provider bootdir planting (CW-20260515-0106)
