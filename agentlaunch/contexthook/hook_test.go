@@ -366,3 +366,124 @@ func TestNew_CustomProvenance(t *testing.T) {
 		t.Fatalf("expected custom provenance to surface, got %q", out)
 	}
 }
+
+// TestNew_PlantArtifacts_FilenameCollision confirms that two distinct
+// slot names which sanitise to the same filename hard-fail with
+// ErrArtifactNameCollision rather than silently overwriting the
+// earlier artifact.
+func TestNew_PlantArtifacts_FilenameCollision(t *testing.T) {
+	hook := contexthook.New(newProvider(t), contexthook.Config{
+		PlantArtifacts: true,
+		SlotExtractor: func(_ *agentlaunch.CompiledLaunch) ([]agentcontext.SlotSpec, error) {
+			// "foo-bar" and "foo_bar" both sanitise to "foo_bar".
+			return []agentcontext.SlotSpec{
+				{
+					Name: "foo-bar",
+					Source: agentcontext.SlotSource{
+						Kind:   agentcontext.SlotSourceKindInline,
+						Inline: agentcontext.InlineSource{Content: "first"},
+					},
+				},
+				{
+					Name: "foo_bar",
+					Source: agentcontext.SlotSource{
+						Kind:   agentcontext.SlotSourceKindInline,
+						Inline: agentcontext.InlineSource{Content: "second"},
+					},
+				},
+			}, nil
+		},
+	})
+
+	_, err := hook(context.Background(), t.TempDir(), newCompiled(t))
+	if err == nil {
+		t.Fatalf("expected collision error, got nil")
+	}
+	if !errors.Is(err, contexthook.ErrArtifactNameCollision) {
+		t.Fatalf("expected ErrArtifactNameCollision, got %v", err)
+	}
+}
+
+// TestNew_WorkdirPrecedence verifies the hook resolves the context
+// request's Workdir using the same precedence launcher.Prepare follows:
+// Workspace.Workdir > ResolvedProjectRoot > Workspace.WorkspaceDir.
+func TestNew_WorkdirPrecedence(t *testing.T) {
+	// Capture the workdir the resolver was invoked with.
+	var capturedWorkdir string
+	captureResolver := agentcontext.ResolverFunc(func(_ context.Context, _ agentcontext.SlotSpec, env agentcontext.ResolverEnv) (agentcontext.SlotResult, error) {
+		capturedWorkdir = env.Workdir
+		return agentcontext.SlotResult{Content: "ok"}, nil
+	})
+	resMap := map[agentcontext.SlotSourceKind]agentcontext.Resolver{
+		agentcontext.SlotSourceKindInline: captureResolver,
+	}
+	prov, err := agentcontext.NewProvider(resMap, agentcontext.DefaultRenderer{})
+	if err != nil {
+		t.Fatalf("NewProvider: %v", err)
+	}
+
+	hook := contexthook.New(prov, contexthook.Config{
+		SlotExtractor: func(_ *agentlaunch.CompiledLaunch) ([]agentcontext.SlotSpec, error) {
+			return []agentcontext.SlotSpec{
+				{
+					Name: "probe",
+					Source: agentcontext.SlotSource{
+						Kind:   agentcontext.SlotSourceKindInline,
+						Inline: agentcontext.InlineSource{Content: "x"},
+					},
+				},
+			}, nil
+		},
+	})
+
+	tests := []struct {
+		name           string
+		workspaceCwd   string
+		projectRoot    string
+		workspaceDir   string
+		wantWorkdir    string
+		wantWorkdirMsg string
+	}{
+		{
+			name:           "Workspace.Workdir wins over ResolvedProjectRoot and WorkspaceDir",
+			workspaceCwd:   "/tmp/cwd-wins",
+			projectRoot:    "/tmp/project-root",
+			workspaceDir:   "/tmp/workspace",
+			wantWorkdir:    "/tmp/cwd-wins",
+			wantWorkdirMsg: "explicit Workspace.Workdir must win",
+		},
+		{
+			name:           "ResolvedProjectRoot wins over WorkspaceDir when Workspace.Workdir empty",
+			workspaceCwd:   "",
+			projectRoot:    "/tmp/project-root",
+			workspaceDir:   "/tmp/workspace",
+			wantWorkdir:    "/tmp/project-root",
+			wantWorkdirMsg: "ResolvedProjectRoot must win when no Workspace.Workdir",
+		},
+		{
+			name:           "WorkspaceDir last-resort when both prior fields empty",
+			workspaceCwd:   "",
+			projectRoot:    "",
+			workspaceDir:   "/tmp/workspace",
+			wantWorkdir:    "/tmp/workspace",
+			wantWorkdirMsg: "WorkspaceDir must win when prior fields empty",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			capturedWorkdir = ""
+			compiled := newCompiled(t)
+			compiled.Plan.Workspace.Workdir = tc.workspaceCwd
+			compiled.Plan.Workspace.WorkspaceDir = tc.workspaceDir
+			compiled.ResolvedProjectRoot = tc.projectRoot
+
+			if _, err := hook(context.Background(), t.TempDir(), compiled); err != nil {
+				t.Fatalf("hook: %v", err)
+			}
+			if capturedWorkdir != tc.wantWorkdir {
+				t.Fatalf("%s: workdir = %q, want %q", tc.wantWorkdirMsg, capturedWorkdir, tc.wantWorkdir)
+			}
+		})
+	}
+}

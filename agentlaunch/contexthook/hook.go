@@ -20,9 +20,11 @@ import (
 //  1. Extract slots from the CompiledLaunch via cfg.SlotExtractor (or
 //     return early with empty bootPrompt when no extractor is supplied
 //     — the documented no-op behaviour).
-//  2. Resolve the request Workdir from
-//     compiled.ResolvedProjectRoot, falling back to
-//     compiled.Plan.Workspace.WorkspaceDir / Workdir.
+//  2. Resolve the request Workdir using the same precedence
+//     launcher.Prepare follows for the spawned process's working
+//     directory: compiled.Plan.Workspace.Workdir →
+//     compiled.ResolvedProjectRoot (the compiler-resolved absolute
+//     form of plan.Project.Root) → compiled.Plan.Workspace.WorkspaceDir.
 //  3. Build the ContextRequest, hand it to provider.Assemble.
 //  4. If cfg.PlantArtifacts, write each non-empty
 //     SlotResult.Content to <bootDir>/context/<sanitised-name>.txt.
@@ -69,15 +71,21 @@ func New(provider agentcontext.ContextProvider, cfg Config) agentlaunch.ContextH
 			return "", nil
 		}
 
-		// 2. Resolve workdir for the context request. Prefer the
-		// compiler-resolved project root (an absolute, expanded path)
-		// over the raw workspace dir.
-		workdir := compiled.ResolvedProjectRoot
-		if workdir == "" && compiled.Plan != nil {
-			workdir = compiled.Plan.Workspace.WorkspaceDir
+		// 2. Resolve workdir using the same precedence
+		// launcher.Prepare follows for the spawned process's working
+		// directory: explicit Workspace.Workdir > ResolvedProjectRoot
+		// (the compiler-resolved absolute form of plan.Project.Root) >
+		// Workspace.WorkspaceDir. Keeping these in lockstep means slot
+		// resolvers see the same cwd the spawned agent process will.
+		var workdir string
+		if compiled.Plan != nil {
+			workdir = compiled.Plan.Workspace.Workdir
+		}
+		if workdir == "" {
+			workdir = compiled.ResolvedProjectRoot
 		}
 		if workdir == "" && compiled.Plan != nil {
-			workdir = compiled.Plan.Workspace.Workdir
+			workdir = compiled.Plan.Workspace.WorkspaceDir
 		}
 
 		// 3. Build provenance.
@@ -151,6 +159,12 @@ func defaultProvenance(compiled *agentlaunch.CompiledLaunch) agentcontext.Proven
 // <bootDir>/context/<sanitised-slot-name>.txt. The directory is created
 // if absent. Empty-content slots are skipped — they would yield empty
 // files with no signal.
+//
+// Slot names are sanitised to A-Za-z0-9_ which means two distinct slot
+// names can collapse to the same filename (e.g. "foo-bar" and "foo_bar"
+// both sanitise to "foo_bar"). Rather than silently overwriting the
+// earlier artifact, we hard-fail with ErrArtifactNameCollision so the
+// caller fixes the slot naming.
 func plantArtifacts(bootDir string, results []agentcontext.SlotResult) error {
 	if bootDir == "" {
 		return fmt.Errorf("%w: bootDir empty", ErrPlantArtifacts)
@@ -159,11 +173,17 @@ func plantArtifacts(bootDir string, results []agentcontext.SlotResult) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("%w: mkdir %q: %v", ErrPlantArtifacts, dir, err)
 	}
+	seen := make(map[string]string, len(results))
 	for _, slot := range results {
 		if slot.Content == "" {
 			continue
 		}
 		name := sanitiseFilename(slot.Name)
+		if prev, dup := seen[name]; dup && prev != slot.Name {
+			return fmt.Errorf("%w: slot names %q and %q sanitise to the same filename %q.txt",
+				ErrArtifactNameCollision, prev, slot.Name, name)
+		}
+		seen[name] = slot.Name
 		path := filepath.Join(dir, name+".txt")
 		if err := os.WriteFile(path, []byte(slot.Content), 0o644); err != nil {
 			return fmt.Errorf("%w: write %q: %v", ErrPlantArtifacts, path, err)
