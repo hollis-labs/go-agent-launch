@@ -16,13 +16,50 @@ go get github.com/hollis-labs/go-agent-launch
 
 ## Usage
 
+The launch pipeline is three stages — `Compile` → `Prepare` → `Plant` —
+plus a conversion shim into [`go-agent-sessions`](https://github.com/hollis-labs/go-agent-sessions):
+
 ```go
-// TODO(phase-1): example after Compile/Prepare lands
+import (
+    "github.com/hollis-labs/go-agent-launch/agentlaunch/launcher"
+    "github.com/hollis-labs/go-agent-launch/agentlaunch/providerplant"
+    "github.com/hollis-labs/go-agent-launch/agentlaunch/sessionshim"
+)
+
+// 1. Compile the declarative LaunchPlan.
+compiled, err := launcher.Compile(ctx, plan)
+
+// 2. Prepare (workspace + bootdir) AND Plant (provider boot files,
+//    native skills/files, injection overlay) in one call.
+prepared, err := providerplant.PrepareAndPlant(ctx, compiled)
+
+// 3. Convert into the go-agent-sessions launch handoff.
+launch, err := sessionshim.ToSessionLaunch(prepared)
+// launch.Binary + launch.Options → agentsessions Manager.Start
 ```
 
-A runnable end-to-end example will live under [`examples/`](./examples) once
-the `LaunchPlan` / `CompiledLaunch` / `PreparedLaunch` surface and the
-`Compile` / `Prepare` entry points are committed.
+### Provider bootdir planting
+
+`providerplant` owns the provider-specific planting layer so consumers
+(Tether, Torque, Nanite) do not each reimplement it. `Plant` resolves the
+go-providers adapter for the launch's `provider×runtime` pair, renders its
+`BootDirSpec`, and writes — in a fixed, deterministic order — the provider
+files, then `InjectionSpec.NativeFiles`, then `InjectionSpec.BootDirOverlay`
+(overlay wins on a path collision). It then rewires the `PreparedLaunch`
+`Env` / `Argv` / `Workdir` from the spec.
+
+`NativeFile` gives first-class support for provider-native extra files
+without app-specific callbacks: a `NativeFileSkill` entry lands at the
+provider's skill path (`.claude/skills/<id>.md`, `.opencode/skills/<id>.md`),
+a `NativeFileRaw` entry is planted verbatim at a path-validated location.
+
+The integration subpackages (`providerplant`, `sessionshim`, `contexthook`)
+each carry exactly one external dependency, so importing the core
+`agentlaunch` package never pulls in `go-providers` or `go-agent-sessions`.
+
+A runnable end-to-end example lives under
+[`examples/providerplant`](./examples/providerplant) — run it with
+`go run ./examples/providerplant`.
 
 ## License
 

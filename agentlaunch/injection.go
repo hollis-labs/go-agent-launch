@@ -32,6 +32,30 @@ type InjectionSpec struct {
 	// stubs, MCP descriptors, or scratch files without going through
 	// the catalog.
 	BootDirOverlay map[string]string `yaml:"boot_dir_overlay,omitempty" json:"boot_dir_overlay,omitempty"`
+
+	// NativeFiles lists provider-native extra files (skills, context
+	// docs, user-supplied files) the provider bootdir planter writes
+	// into the planted bootdir. Unlike BootDirOverlay — a flat
+	// path→content map — each NativeFile carries a Kind so the planter
+	// can resolve provider-native paths (.claude/skills/<id>.md etc.)
+	// without an app-specific callback. Validated per-entry by
+	// LaunchPlan.Validate. See the NativeFile type and the providerplant
+	// package for planting order and path conventions.
+	NativeFiles []NativeFile `yaml:"native_files,omitempty" json:"native_files,omitempty"`
+}
+
+// ValidateBootDirRelPath reports an error when rel is unsafe to use as a
+// bootdir-relative target. It is the exported form of the path-safety
+// rule LaunchPlan.Validate applies to BootDirOverlay keys: rel must be
+// non-empty, relative, free of ".." segments, and must not target a
+// reserved name (".git/", ".ssh/", …). Returns ErrUnsafeInjectionTarget
+// on any violation.
+//
+// The provider bootdir planter (providerplant package) calls this a
+// second time at planting phase so a PreparedLaunch assembled outside
+// the Compile/Validate path still cannot escape the bootdir.
+func ValidateBootDirRelPath(rel string) error {
+	return validateOverlayKey(rel)
 }
 
 // reservedOverlayPrefixes lists path prefixes that the overlay map is

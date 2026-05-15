@@ -67,4 +67,23 @@ var (
 	// ErrPreparedMissingArgv is returned by PreparedLaunch.Validate when
 	// Argv has length zero — at minimum the spawned binary must be named.
 	ErrPreparedMissingArgv = errors.New("agentlaunch: prepared launch missing argv")
+
+	// ErrUnknownNativeFileKind is returned by NativeFile.Validate when
+	// NativeFile.Kind is not one of the declared NativeFileKind values.
+	ErrUnknownNativeFileKind = errors.New("agentlaunch: unknown native file kind")
+
+	// ErrNativeFileMissingID is returned by NativeFile.Validate when a
+	// NativeFileSkill entry has an empty ID — the ID is required because
+	// it derives the planted filename (.claude/skills/<ID>.md etc.).
+	ErrNativeFileMissingID = errors.New("agentlaunch: native skill file missing id")
+
+	// ErrNativeFileUnsafeID is returned by NativeFile.Validate when a
+	// NativeFileSkill entry's ID is not a safe single path segment (it
+	// contains a separator, a "." / ".." traversal token, or a rune
+	// outside [A-Za-z0-9._-]).
+	ErrNativeFileUnsafeID = errors.New("agentlaunch: native skill file id is not a safe path segment")
+
+	// ErrNativeFileMissingRelPath is returned by NativeFile.Validate when
+	// a NativeFileRaw entry has an empty RelPath.
+	ErrNativeFileMissingRelPath = errors.New("agentlaunch: native raw file missing relpath")
 )
