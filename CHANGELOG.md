@@ -4,6 +4,36 @@ All notable changes to `go-agent-launch` are documented in this file. Per-releas
 
 ## Unreleased
 
+## v0.3.2 — 2026-05-17
+
+### Added — `ResolveRuntimeBinding`: `runner` → `RuntimeBinding` registry resolver
+
+The caller convenience the bridge design (§5) names. `PlanFromLaunch` (v0.3.0)
+is a pure transform that takes an already-resolved `RuntimeBinding`; resolving
+the bag's `runner` input to one is the caller's concern (D1 — resolution is
+local-first, caller-owned). `ResolveRuntimeBinding` does that resolution:
+
+- **`agentlaunch.ResolveRuntimeBinding(reg Registrar, descriptor RegistryRegistrar, runnerID string) (RuntimeBinding, error)`** —
+  issues a `query` envelope for `kind=runtime-binding, name=runnerID`, takes
+  the single matching `RegistrationRecord`, loads the file its
+  `RegistrationSource` points at (the registry stores handles, not content —
+  D2), decodes + validates the `RuntimeBindingContract`, and returns its
+  `Binding`.
+- **`ErrRuntimeBindingNotFound`** — a distinct sentinel for "nothing
+  registered under runnerID", so a caller can branch on it. The function
+  never falls back to a spec-baked default — per the PlanFromLaunch §4.1
+  decision, any fallback must be a deliberate, observable caller choice.
+- An ambiguous match (more than one record), an unreadable/malformed source
+  file, or a contract that fails validation each return a wrapped error.
+
+Torque does not use this — it resolves `runner` from its own `profiles.yaml`
+`agent_profiles`. It is for consumers (Tether, Nanite) that resolve runners
+through the directory registry.
+
+### Changed
+
+- `Version` bumped to v0.3.2.
+
 ## v0.3.1 — 2026-05-17
 
 ### Fixed

@@ -8,7 +8,7 @@ import "time"
 //
 // Held in a typed string constant (rather than the conventional pkg-level
 // Version variable) so it cannot be reassigned by a caller.
-const Version = "v0.3.1"
+const Version = "v0.3.2"
 
 // Provenance records compile-time provenance on a CompiledLaunch so
 // downstream consumers can attribute a launch back to the catalog
