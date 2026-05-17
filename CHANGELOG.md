@@ -4,6 +4,43 @@ All notable changes to `go-agent-launch` are documented in this file. Per-releas
 
 ## Unreleased
 
+## v0.3.0 — 2026-05-17
+
+### Added — `PlanFromLaunch`: the LaunchSpec → LaunchPlan bridge
+
+The S4 parameterized-launch model (`LaunchSpec` + `LaunchBag` + var
+resolution + `Render`) produced a `RenderResult` and stopped there — the
+execution pipeline (`launcher.Compile → Prepare → Plant`) consumes a
+`LaunchPlan`, and nothing assembled one from the new model. `PlanFromLaunch`
+is that missing seam, so both front-ends drive the same shipped pipeline.
+
+- **`agentlaunch.PlanFromLaunch(PlanFromLaunchInput) (LaunchPlan, error)`** —
+  a pure, deterministic, I/O-free transform. The caller owns resolution
+  (vars, `runner`→`RuntimeBinding`, agent); the bridge owns assembly. The
+  returned plan is `Validate()`-clean and ready for `launcher.Compile` — the
+  shipped Compile → Prepare → Plant pipeline is reused unchanged.
+- `runner` is the sole runtime source: the bridge never reads the spec's
+  embedded `BootSpec.Runtime`. An empty/invalid `RuntimeBinding` is a hard
+  error — there is no spec-baked fallback.
+- The agent identity is a bridge input (`PlanFromLaunchInput.Agent`), never
+  read from the LaunchSpec — agent content stays consumer-owned.
+- `MCP` / `Injection` / `Metadata` on the returned plan are a base the
+  consumer overlays. The raw `isolation` token, the `RuntimeBinding.Timeout`,
+  and the spec/bag ids are surfaced on `Metadata.Annotations`.
+
+### Changed
+
+- `Version` is now `v0.3.0` — it had been left at the `v0.1.0-dev`
+  placeholder through v0.2.0.
+
+### Notes
+
+- The `runner` → `RuntimeBinding` registry resolver helper
+  (`ResolveRuntimeBinding`) is a v0.3.1 fast-follow. It is a caller
+  convenience — `PlanFromLaunch` is pure and each consumer resolves `runner`
+  its own way — so it does NOT gate the S5 dispatch-wiring step; the bridge
+  does, and the bridge ships here.
+
 ## v0.2.0 — 2026-05-17
 
 First tagged release of the parameterized-launch engine: the S1 platform
