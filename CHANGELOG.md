@@ -4,6 +4,38 @@ All notable changes to `go-agent-launch` are documented in this file. Per-releas
 
 ## Unreleased
 
+## v0.3.5 — 2026-05-17
+
+### Added — parity-harness extensibility: caller-supplied corpus + expected registries
+
+`RunParity` could only run its built-in 11-entry `Corpus` against the
+package-scoped, staleness-guarded `expectedDiffs` / `expectedOldErrors`
+registries — a consumer running a wider corpus (e.g. Tether's full 64-launch
+catalog) had no way to register its own intentional divergences. This adds
+that surface.
+
+- **`RunParity(catalogRoot, specsRoot string, opts ...Option)`** — variadic
+  options; the no-option call is unchanged (built-in corpus + registries).
+- **`WithCorpus([]CorpusEntry)`** — run parity over a caller-supplied corpus.
+- **`WithExpectedDiffs(...ExpectedDiff)`** / **`WithExpectedOldErrors(map[string]string)`**
+  — register additional intentional divergences, merged with the built-in
+  registries for that run.
+- **`ExpectedDiff`** — the previously-unexported `expectedDiff` is now
+  exported so callers can construct entries for `WithExpectedDiffs`.
+- **`Report.StaleExpected() []string`** — reports expected-registry entries
+  the run's corpus never produced (a stale entry would mask a future real
+  divergence). Generalizes the harness's own staleness guard so a consumer
+  can `assert len(report.StaleExpected()) == 0` over its own corpus.
+- `CaseResult.OldErrExpected` — the rationale resolved for an expected
+  old-side error, classified at `RunParity` time against the effective
+  registry.
+
+Additive: existing `RunParity(catalogRoot, specsRoot)` callers are unchanged.
+
+### Changed
+
+- `Version` bumped to v0.3.5.
+
 ## v0.3.4 — 2026-05-17
 
 ### Added — `Compile` rejects a headless claude launch with no permission posture

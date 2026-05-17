@@ -95,6 +95,12 @@ type CaseResult struct {
 
 	// Diffs lists every field where the two projections disagree.
 	Diffs []FieldDiff
+
+	// OldErrExpected is the rationale when OldErr is a documented,
+	// intentional legacy-catalog defect — resolved against the run's
+	// effective expected-old-error registry at RunParity time. Empty when
+	// OldErr is nil or the failure is unexplained.
+	OldErrExpected string
 }
 
 // ExpectedOldErr is non-empty when the old-side resolution failure is a
@@ -102,10 +108,10 @@ type CaseResult struct {
 // An expected old-side error is NOT a parity failure: it records that the
 // new model deliberately diverges from a broken legacy launch.
 func (c CaseResult) expectedOldErrRationale() (string, bool) {
-	if c.OldErr == nil {
+	if c.OldErr == nil || c.OldErrExpected == "" {
 		return "", false
 	}
-	return lookupExpectedOldErr(c.Launch)
+	return c.OldErrExpected, true
 }
 
 // Parity reports whether the case is a clean pass. A case passes when
@@ -138,6 +144,52 @@ type Report struct {
 
 	// Cases is one CaseResult per corpus launch, in corpus order.
 	Cases []CaseResult
+
+	// effExpectedDiffs / effExpectedOldErrors are the effective expected
+	// registries this run classified against — the built-in sets merged
+	// with any WithExpectedDiffs / WithExpectedOldErrors entries. Retained
+	// so StaleExpected can report registry entries the run never observed.
+	effExpectedDiffs     []ExpectedDiff
+	effExpectedOldErrors map[string]string
+}
+
+// StaleExpected reports expected-diff / expected-old-error registry entries
+// that the run's corpus never actually produced — a stale entry would
+// silently mask a future real divergence on the same launch+field. The
+// returned slice is sorted; empty means every registered expectation fired.
+//
+// This generalizes the harness's own staleness guard: a consumer running
+// RunParity over a wider corpus with WithExpectedDiffs / WithExpectedOldErrors
+// can assert len(report.StaleExpected()) == 0 against its own registry.
+func (r Report) StaleExpected() []string {
+	observedDiff := map[string]bool{}
+	observedOldErr := map[string]bool{}
+	for _, c := range r.Cases {
+		if c.OldErr != nil && c.OldErrExpected != "" {
+			observedOldErr[c.Launch] = true
+		}
+		for _, d := range c.Diffs {
+			if d.Explained() {
+				observedDiff[c.Launch+"/"+d.Field] = true
+			}
+		}
+	}
+	var stale []string
+	for _, e := range r.effExpectedDiffs {
+		if e.Launch == "" {
+			continue // wildcard entry — cannot key-check
+		}
+		if !observedDiff[e.Launch+"/"+e.Field] {
+			stale = append(stale, "expected-diff "+e.Launch+"/"+e.Field)
+		}
+	}
+	for launch := range r.effExpectedOldErrors {
+		if !observedOldErr[launch] {
+			stale = append(stale, "expected-old-error "+launch)
+		}
+	}
+	sort.Strings(stale)
+	return stale
 }
 
 // Passed reports whether every case in the corpus is a clean parity pass.
@@ -438,7 +490,7 @@ func inputString(m map[string]any, key string) string {
 
 // diff compares the old and new projections and classifies every field
 // disagreement against the expected-diff registry for launch.
-func diff(launch string, old, new NormalizedPlan) []FieldDiff {
+func diff(launch string, old, new NormalizedPlan, registry []ExpectedDiff) []FieldDiff {
 	var diffs []FieldDiff
 	oldF := old.fields()
 	newF := new.fields()
@@ -451,7 +503,7 @@ func diff(launch string, old, new NormalizedPlan) []FieldDiff {
 			Old:   oldF[i].value,
 			New:   newF[i].value,
 		}
-		if exp, ok := lookupExpectedDiff(launch, d.Field, d.Old, d.New); ok {
+		if exp, ok := lookupExpectedDiff(registry, launch, d.Field, d.Old, d.New); ok {
 			d.Expected = exp
 		}
 		diffs = append(diffs, d)
@@ -459,18 +511,81 @@ func diff(launch string, old, new NormalizedPlan) []FieldDiff {
 	return diffs
 }
 
-// RunParity executes the parity harness over the whole Corpus.
+// Option configures RunParity. With no options RunParity runs the built-in
+// Corpus and built-in expected registries; the With* options let a consumer
+// run parity over a wider corpus with its own expected divergences.
+type Option func(*runConfig)
+
+// runConfig is the resolved RunParity configuration (built from Options).
+type runConfig struct {
+	corpus              []CorpusEntry
+	extraExpectedDiffs  []ExpectedDiff
+	extraExpectedOldErr map[string]string
+}
+
+// WithCorpus replaces the corpus RunParity iterates (default: the built-in
+// 11-entry Corpus). Use it to run parity over a consumer's full launch set.
+func WithCorpus(entries []CorpusEntry) Option {
+	return func(c *runConfig) { c.corpus = entries }
+}
+
+// WithExpectedDiffs registers additional intentional old-vs-new divergences,
+// merged with the built-in registry. Required when a wider corpus surfaces
+// documented legacy-catalog defects the built-in registry does not cover.
+func WithExpectedDiffs(diffs ...ExpectedDiff) Option {
+	return func(c *runConfig) { c.extraExpectedDiffs = append(c.extraExpectedDiffs, diffs...) }
+}
+
+// WithExpectedOldErrors registers additional launches whose old-side
+// resolution is expected to fail (a documented legacy-catalog defect),
+// merged with the built-in registry. Keyed by launch (bag) name.
+func WithExpectedOldErrors(m map[string]string) Option {
+	return func(c *runConfig) {
+		if c.extraExpectedOldErr == nil {
+			c.extraExpectedOldErr = map[string]string{}
+		}
+		for k, v := range m {
+			c.extraExpectedOldErr[k] = v
+		}
+	}
+}
+
+// RunParity executes the parity harness over a corpus of launches.
 //
 //   - catalogRoot is the live ~/.tether/catalog/ directory (read-only).
 //   - specsRoot is the S4.4 testdata specs directory (the one holding
 //     launch-assembly.yaml and the launches/ bag subdir).
+//   - opts default to the built-in Corpus + expected registries; WithCorpus
+//     / WithExpectedDiffs / WithExpectedOldErrors run a wider corpus.
 //
 // RunParity returns an error only for a setup failure (a catalog or spec
 // root that cannot be loaded at all). A per-launch resolution failure or a
 // field divergence is captured in the Report, not returned as an error —
-// the caller inspects Report.Passed / Report.UnexplainedDiffs.
-func RunParity(catalogRoot, specsRoot string) (Report, error) {
-	report := Report{CatalogRoot: catalogRoot, SpecsRoot: specsRoot}
+// the caller inspects Report.Passed / Report.StaleExpected.
+func RunParity(catalogRoot, specsRoot string, opts ...Option) (Report, error) {
+	cfg := runConfig{}
+	for _, opt := range opts {
+		opt(&cfg)
+	}
+	corpus := Corpus
+	if cfg.corpus != nil {
+		corpus = cfg.corpus
+	}
+	expDiffs := append(append([]ExpectedDiff(nil), expectedDiffs...), cfg.extraExpectedDiffs...)
+	expOldErr := map[string]string{}
+	for k, v := range expectedOldErrors {
+		expOldErr[k] = v
+	}
+	for k, v := range cfg.extraExpectedOldErr {
+		expOldErr[k] = v
+	}
+
+	report := Report{
+		CatalogRoot:          catalogRoot,
+		SpecsRoot:            specsRoot,
+		effExpectedDiffs:     expDiffs,
+		effExpectedOldErrors: expOldErr,
+	}
 
 	// --- Old side setup: load the live catalog (read-only). ---
 	g, err := catalog.LoadGlobal(catalogRoot)
@@ -487,7 +602,7 @@ func RunParity(catalogRoot, specsRoot string) (Report, error) {
 		return report, fmt.Errorf("parity: load new-side spec %q: %w", specPath, err)
 	}
 
-	for _, entry := range Corpus {
+	for _, entry := range corpus {
 		if entry.LegacyID == "" {
 			continue
 		}
@@ -496,6 +611,9 @@ func RunParity(catalogRoot, specsRoot string) (Report, error) {
 		oldPlan, oldErr := resolveOld(g, entry.LegacyID)
 		if oldErr != nil {
 			cr.OldErr = oldErr
+			if rat, ok := lookupExpectedOldErr(expOldErr, entry.BagFile); ok {
+				cr.OldErrExpected = rat
+			}
 		} else {
 			cr.Old = oldPlan
 		}
@@ -509,7 +627,7 @@ func RunParity(catalogRoot, specsRoot string) (Report, error) {
 		}
 
 		if oldErr == nil && newErr == nil {
-			cr.Diffs = diff(entry.BagFile, oldPlan, newPlan)
+			cr.Diffs = diff(entry.BagFile, oldPlan, newPlan, expDiffs)
 		}
 		report.Cases = append(report.Cases, cr)
 	}

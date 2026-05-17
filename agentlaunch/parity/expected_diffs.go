@@ -10,8 +10,10 @@ package parity
 // harness. Adding an entry is a deliberate act: it records that a divergence
 // was reviewed and judged correct, with the rationale attached.
 
-// expectedDiff is one registered intentional divergence.
-type expectedDiff struct {
+// ExpectedDiff is one registered intentional divergence. It is also the
+// shape a caller passes to WithExpectedDiffs when running RunParity over a
+// corpus wider than the built-in one.
+type ExpectedDiff struct {
 	// Launch is the corpus launch name (the testdata bag stem) the diff
 	// applies to. Empty matches any launch.
 	Launch string
@@ -46,7 +48,7 @@ type expectedDiff struct {
 // not a parity failure. (The legacy catalog is read-only here and is left
 // untouched; the fix lives in the new model and, eventually, in a catalog
 // data correction outside this lib.)
-var expectedDiffs = []expectedDiff{
+var expectedDiffs = []ExpectedDiff{
 	// --- agent-mux: project re-pointed (5 launches) ---
 	{
 		Launch:    "agent-mux-claude",
@@ -136,28 +138,33 @@ var expectedDiffs = []expectedDiff{
 // agent into the `agent_role` input (web-writer), so the new side resolves
 // cleanly. The old-side failure is expected and documented here.
 //
-// NOTE: this registry is scoped to the harness's own Corpus (the 11-entry
-// S4.4 set) — TestParity_ExpectedDiffsAreObserved rejects an entry the
-// in-corpus old side does not actually trip. A consumer running a WIDER
-// corpus (e.g. Tether's full 64-launch catalog, which surfaces two more
-// dangling-agent launches) cannot register its rationales here; that needs
-// the caller-supplied expected-diffs surface tracked as a follow-up.
+// NOTE: this built-in registry is scoped to the harness's own Corpus (the
+// 11-entry S4.4 set). A consumer running a WIDER corpus (e.g. Tether's full
+// 64-launch catalog, which surfaces more dangling-agent launches) does NOT
+// add entries here — it passes its rationales to RunParity via
+// WithExpectedOldErrors / WithExpectedDiffs, which merge with this registry
+// for that run. Report.StaleExpected then staleness-checks the merged set
+// against the run's corpus.
 var expectedOldErrors = map[string]string{
 	"hollislabs-web-writer-claude": "hollislabs-web-writer-dangling-agent: legacy launch references agent:web-writer with no agents/web-writer.yaml in the catalog; new bag folds it into the agent_role input",
 }
 
 // lookupExpectedOldErr reports whether launch has a documented, intentional
-// old-side resolution failure, returning the rationale when it does.
-func lookupExpectedOldErr(launch string) (string, bool) {
-	rat, ok := expectedOldErrors[launch]
+// old-side resolution failure in registry m, returning the rationale when
+// it does. m is the run's effective expected-old-error registry (the
+// built-in expectedOldErrors merged with any WithExpectedOldErrors entries).
+func lookupExpectedOldErr(m map[string]string, launch string) (string, bool) {
+	rat, ok := m[launch]
 	return rat, ok
 }
 
 // lookupExpectedDiff reports whether (launch, field, old, new) matches a
-// registered intentional divergence, returning the rationale when it does.
-// An empty Old or New on a registry entry is a wildcard for that side.
-func lookupExpectedDiff(launch, field, old, new string) (string, bool) {
-	for _, e := range expectedDiffs {
+// registered intentional divergence in the registry slice, returning the
+// rationale when it does. An empty Old or New on a registry entry is a
+// wildcard for that side. registry is the run's effective expected-diff set
+// (the built-in expectedDiffs merged with any WithExpectedDiffs entries).
+func lookupExpectedDiff(registry []ExpectedDiff, launch, field, old, new string) (string, bool) {
+	for _, e := range registry {
 		if e.Launch != "" && e.Launch != launch {
 			continue
 		}

@@ -91,46 +91,74 @@ func TestParity_FixtureCorpus(t *testing.T) {
 	}
 }
 
-// TestParity_ExpectedDiffsAreObserved guards the expected-diff registry
-// against rot: every registered intentional divergence must actually be
-// produced by the harness. A registry entry that never fires is stale and
-// would silently mask a future real diff on the same field.
+// TestParity_ExpectedDiffsAreObserved guards the expected-diff /
+// expected-old-error registries against rot: every registered intentional
+// divergence must actually be produced by the harness. A registry entry
+// that never fires is stale and would silently mask a future real diff on
+// the same launch+field. Report.StaleExpected does the check.
 func TestParity_ExpectedDiffsAreObserved(t *testing.T) {
 	catalogRoot := filepath.Join(callerDir(t), "testdata", "catalog")
 	report, err := RunParity(catalogRoot, specsRoot(t))
 	if err != nil {
 		t.Fatalf("RunParity: %v", err)
 	}
+	if stale := report.StaleExpected(); len(stale) != 0 {
+		t.Errorf("stale expected-registry entries (registered but never observed): %v", stale)
+	}
+}
 
-	observed := map[string]bool{}
-	for _, c := range report.Cases {
-		for _, d := range c.Diffs {
-			if d.Explained() {
-				observed[c.Launch+"/"+d.Field] = true
-			}
-		}
+// TestParity_RunOptions exercises the consumer-extensibility surface:
+// WithCorpus (RunParity iterates exactly the supplied corpus) and
+// WithExpectedOldErrors (a caller-registered rationale is merged in and
+// consulted, and is staleness-checked like a built-in entry).
+func TestParity_RunOptions(t *testing.T) {
+	catalogRoot := filepath.Join(callerDir(t), "testdata", "catalog")
+
+	// WithCorpus + WithExpectedOldErrors: a 2-entry corpus — one clean
+	// launch, one dangling-agent launch the caller registers — passes.
+	corpus := []CorpusEntry{
+		{BagFile: "tether-claude", LegacyID: "tether-claude"},
+		{BagFile: "hollislabs-web-writer-claude", LegacyID: "hollislabs-web-writer-claude"},
 	}
-	for _, e := range expectedDiffs {
-		if e.Launch == "" {
-			continue // wildcard entry — cannot key-check
-		}
-		if !observed[e.Launch+"/"+e.Field] {
-			t.Errorf("stale expected-diff: %s/%s registered but never observed by the harness",
-				e.Launch, e.Field)
+	report, err := RunParity(catalogRoot, specsRoot(t),
+		WithCorpus(corpus),
+		WithExpectedOldErrors(map[string]string{
+			"hollislabs-web-writer-claude": "caller-registered dangling-agent defect",
+		}),
+	)
+	if err != nil {
+		t.Fatalf("RunParity: %v", err)
+	}
+	if len(report.Cases) != 2 {
+		t.Fatalf("WithCorpus: got %d cases, want 2", len(report.Cases))
+	}
+	if !report.Passed() {
+		t.Errorf("2-entry corpus with a caller-registered old-error should pass; cases=%+v", report.Cases)
+	}
+	// The caller's expected-old-error fired → it must NOT be reported stale.
+	for _, s := range report.StaleExpected() {
+		if s == "expected-old-error hollislabs-web-writer-claude" {
+			t.Error("a caller expected-old-error that fired should not be stale")
 		}
 	}
 
-	// Every expected old-side error must actually be observed too.
-	observedOldErr := map[string]bool{}
-	for _, c := range report.Cases {
-		if c.OldErr != nil {
-			observedOldErr[c.Launch] = true
+	// StaleExpected catches a caller entry that never fires: an
+	// expected-old-error registered for a cleanly-resolving launch.
+	bogus, err := RunParity(catalogRoot, specsRoot(t),
+		WithCorpus([]CorpusEntry{{BagFile: "tether-claude", LegacyID: "tether-claude"}}),
+		WithExpectedOldErrors(map[string]string{"tether-claude": "bogus — tether-claude resolves fine"}),
+	)
+	if err != nil {
+		t.Fatalf("RunParity (bogus): %v", err)
+	}
+	foundStale := false
+	for _, s := range bogus.StaleExpected() {
+		if s == "expected-old-error tether-claude" {
+			foundStale = true
 		}
 	}
-	for launch := range expectedOldErrors {
-		if !observedOldErr[launch] {
-			t.Errorf("stale expected-old-error: %s registered but the old side resolved cleanly", launch)
-		}
+	if !foundStale {
+		t.Error("a caller expected-old-error for a cleanly-resolving launch should be reported stale")
 	}
 }
 
