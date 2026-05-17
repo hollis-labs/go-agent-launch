@@ -221,4 +221,18 @@ var (
 	// ErrRegistryUnknownHealthStatus is returned when a health envelope
 	// names an unknown status value.
 	ErrRegistryUnknownHealthStatus = errors.New("agentlaunch: registry health status is unknown")
+
+	// ErrRegistryDuplicateObject is returned by the registrar when a
+	// register operation targets a RegistryObjectRef that already exists
+	// and RegisterPayload.Upsert is false.
+	ErrRegistryDuplicateObject = errors.New("agentlaunch: registry object already registered")
+
+	// ErrRegistryObjectNotFound is returned by the registrar when a
+	// deregister operation targets a RegistryObjectRef that is not
+	// present in the store.
+	ErrRegistryObjectNotFound = errors.New("agentlaunch: registry object not found")
+
+	// ErrRegistryUnsupportedOperation is returned by the registrar when an
+	// envelope names an operation the live service does not implement.
+	ErrRegistryUnsupportedOperation = errors.New("agentlaunch: registry operation is not supported")
 )
