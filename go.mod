@@ -4,8 +4,8 @@ go 1.26.1
 
 require (
 	github.com/hollis-labs/go-agent-context v0.1.0
-	github.com/hollis-labs/go-agent-sessions v0.9.4
-	github.com/hollis-labs/go-providers v0.17.1
+	github.com/hollis-labs/go-agent-sessions v0.9.5
+	github.com/hollis-labs/go-providers v0.20.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 

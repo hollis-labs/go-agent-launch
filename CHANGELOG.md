@@ -4,6 +4,33 @@ All notable changes to `go-agent-launch` are documented in this file. Per-releas
 
 ## Unreleased
 
+## v0.2.0 — 2026-05-17
+
+First tagged release of the parameterized-launch engine: the S1 platform
+contracts, the S3 directory registry, and the S4 Boot Assembly Spec /
+var-resolution / materialization / launch-spec / parity layers — plus the
+dependency bump below so the engine builds against the fixed provider and
+session libraries the S5 cutover consumers require.
+
+### Changed — dependency bump: go-providers v0.20.0, go-agent-sessions v0.9.5
+
+Bumps the provider/runtime libraries (go-providers v0.17.1 → v0.20.0,
+go-agent-sessions v0.9.4 → v0.9.5) so the engine builds and materializes
+against the libraries that carry the agent-execution fixes the S5 cutover
+depends on:
+
+- **go-providers v0.20.0** — `CodexAdapter.ApprovalPolicy` / `SandboxMode`;
+  the planted codex `config.toml` always carries a non-interactive
+  `approval_policy` / `sandbox_mode` (fixes the headless-codex approval
+  deadlock). Includes v0.18.0–v0.19.0: current-schema
+  `.claude/settings.json` and first-class `ClaudeAdapter.PermissionMode`.
+- **go-agent-sessions v0.9.5** — the `jsonrpc-stdio` runtime answers
+  server-initiated requests instead of dropping them (fixes the codex
+  `app-server` approval-elicitation deadlock); adds `JsonRpcRequestHook`.
+
+No go-agent-launch API change — the bump is additive on the dependency
+side; the full build + test suite is green against the new versions.
+
 ### Added — old-vs-new launch-plan parity harness (S4.5, CW-20260517-0030)
 
 The cutover gate for the Tether platform reshape: before S5 flips live
