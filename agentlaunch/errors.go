@@ -267,4 +267,13 @@ var (
 	// only. The error wraps the underlying inner failure so callers can
 	// inspect the root cause with errors.Is / errors.Unwrap.
 	ErrRegistryWriteWhileDegraded = errors.New("agentlaunch: registry write rejected while directory unreachable")
+
+	// ErrRegistryBusTopicMissingTopic is returned by BusTopicContract.Validate
+	// when the topic name/address on the bus is empty. The contract is a
+	// handle to a bus topic; without the topic address it is unresolvable.
+	ErrRegistryBusTopicMissingTopic = errors.New("agentlaunch: registry bus topic name is missing")
+
+	// ErrRegistryBusTopicUnknownDirection is returned by BusTopicContract.Validate
+	// when Direction is not one of the declared BusTopicDirection values.
+	ErrRegistryBusTopicUnknownDirection = errors.New("agentlaunch: registry bus topic direction is unknown")
 )
