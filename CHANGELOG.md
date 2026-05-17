@@ -4,6 +4,43 @@ All notable changes to `go-agent-launch` are documented in this file. Per-releas
 
 ## Unreleased
 
+### Added — old-vs-new launch-plan parity harness (S4.5, CW-20260517-0030)
+
+The cutover gate for the Tether platform reshape: before S5 flips live
+consumers onto the new launch model, the new model must provably
+reproduce the old model's launch-identity resolution. This adds the
+harness that proves it.
+
+- **`agentlaunch/parity/`** — a new subpackage.
+  - `RunParity` resolves each catalog-corpus launch BOTH ways — the
+    legacy static-file path (`catalog.LoadGlobal` + `GlobalCatalog.Resolve`
+    → `LaunchPlan`) and the new S4.4 path (`LoadLaunchSpec` +
+    `LoadLaunchBag` + S4.2 var resolution + `LaunchSpec.Render`) — and
+    diffs the resulting `NormalizedPlan` (project, work_dir, runner,
+    isolation): the launch identity both models share.
+  - `expectedDiffs` / `expectedOldErrors` are the annotated registry of
+    intentional divergences. A non-zero diff passes only if it is
+    documented there; an unexplained diff fails the harness.
+  - The catalog corpus is the 11 S4.4 launch bags that re-express a real
+    legacy launch (the synthetic `tether-minimum` bag has no legacy
+    counterpart and is excluded).
+  - `NormalizeRuntimeKinds` is a documented in-memory pre-processing step:
+    the live `~/.tether/catalog/` providers mostly omit `runtime_kind`, so
+    the old-side `Resolve` would fail; this bridges `bootstrap.mode` →
+    `runtime_kind`. It never writes the catalog.
+  - The harness is read-only on `~/.tether/catalog/` and ships a
+    self-contained fixture catalog so CI runs deterministically with no
+    Tether install; `TestParity_LiveCatalog` opportunistically checks the
+    live catalog when present.
+- **`.github/workflows/check.yml`** — CI workflow (fmt / vet /
+  golangci-lint / `go test -race` / govulncheck) with an explicit
+  `parity harness (S4.5 cutover gate)` step that runs on every push/PR.
+
+Parity result over the corpus: 5 launches identical, 6 explained
+divergences (5 × the `agent-mux` project-repoint, 1 × the
+`hollislabs-web-writer` dangling-agent legacy defect). Zero unexplained
+diffs.
+
 ### Added — launch Specs + templates (S4.4, CW-20260517-0029)
 
 Collapses the legacy `~/.tether/catalog/launches/` (64 files) and
