@@ -6,7 +6,12 @@ It sits **above** [`go-agent-sessions`](https://github.com/hollis-labs/go-agent-
 
 ## Status
 
-v0 — foundation. Public API in flux; expect breaking changes before the v0.1.0 tag. This repository currently ships the package scaffold only; the launch pipeline types, compiler, and preparer land in subsequent Phase 1 subagents under sprint `SP-20260514-0003`.
+`v0.1.x` shared-lib contract. The existing `LaunchPlan -> CompiledLaunch -> PreparedLaunch` flow remains the stable launch handoff, and the boot-assembly API is now split explicitly into:
+
+- `agentlaunch.RuntimeBinding`: the hot-path-readable `provider / model / runtime_kind / args / timeout` contract.
+- `agentlaunch.BootSpec`: the parameterized blueprint carrying `inputs[]`, `files[]`, `vars[]`, `injections[]`, and the associated runtime binding.
+
+`agentlaunch.RuntimeKind` is canonical across those surfaces. Consumer overlays still win on runtime-critical launch fields when plans are compiled and prepared.
 
 ## Install
 
@@ -60,6 +65,27 @@ each carry exactly one external dependency, so importing the core
 A runnable end-to-end example lives under
 [`examples/providerplant`](./examples/providerplant) — run it with
 `go run ./examples/providerplant`.
+
+## Frozen Boot Contract
+
+The shared boot contract published by this library is:
+
+- `BootInput`: Hadron-style typed inputs with `name`, `type`, `required`, `default`, and `description`.
+- `VarSpec`: derived vars with `source`, `freshness`, `fallback`, `on_error`, `phase`, and `secret`.
+- `BootFileSpec` / `BootInjectionSpec`: path-safe bootdir materialization targets.
+- `Materializer`: idempotent populate-against-existing-dir plus partial replant by file ID, injection ID, or slot ref.
+
+Var source kinds are `literal`, `file`, `call`, and `cmd`. `call` supports `mcp` and `http` transports. Secret vars may not persist inline literal/fallback values at rest, and `call` / `cmd` vars require an explicit trust or authorization gate in schema.
+
+## Directory Registry Contract
+
+The shared directory-registry contract published by this library is local-first and file-backed by design:
+
+- `RegistrationRecord` registers a stable `kind / owner / namespace / name` handle against a local contract file, with optional directory enrichment metadata.
+- `RegistryEnvelope` defines the `register`, `deregister`, `query`, and `health` envelope with `resolution=local-first`.
+- Published kind contracts include `agent-source`, `skill-source`, `mcp-server`, `runtime-binding`, `boot-spec`, `execution-template`, and `contract-object`.
+
+`agent-source` and `skill-source` carry resolver handles only, not profile/skill bodies. `execution-template` composes references to distinct `runtime-binding` and `boot-spec` kinds rather than inlining them back together.
 
 ## License
 

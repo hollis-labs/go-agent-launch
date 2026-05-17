@@ -6,6 +6,12 @@ package agentlaunch
 // (CW-0005) need to turn a catalog entry plus a runtime selection into
 // a ready-to-spawn session.
 //
+// LaunchPlan remains the stable LaunchSpec-equivalent integration view
+// for existing consumers even after the BootSpec / RuntimeBinding split:
+// BootSpec defines the frozen boot-assembly blueprint, while LaunchPlan
+// continues to be the compile/prepare handoff where consumer runtime
+// overlays take precedence.
+//
 // A LaunchPlan is value-typed and shareable across goroutines. Maps
 // and slices inside it are NOT defensively copied — callers must not
 // mutate them after the plan is handed to Compile.

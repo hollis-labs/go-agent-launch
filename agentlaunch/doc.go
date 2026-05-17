@@ -15,15 +15,21 @@
 //     the capabilities of the selected go-providers adapter and the
 //     go-agent-sessions lifecycle shape,
 //   - the Tether-compatible catalog schema so a single catalog entry can
-//     drive every consumer in the portfolio.
+//     drive every consumer in the portfolio,
+//   - the frozen shared contract types for RuntimeBinding, BootSpec,
+//     VarSpec, and the bootdir materializer API.
 //
 // The library is intentionally app-neutral. It imports go-agent-sessions
 // and go-providers but no app-specific repository (Tether, Torque,
 // Nanite). Consumers configure the pipeline through caller-supplied
 // types and sinks rather than direct dependencies on any orchestrator.
 //
-// The current scaffold ships this package documentation only. The
-// LaunchPlan / CompiledLaunch / PreparedLaunch surface, the Compile and
-// Prepare entry points, and the provider × runtime matrix land in
-// subsequent Phase 1 subagents under sprint SP-20260514-0003.
+// API note: RuntimeBinding and BootSpec are intentionally distinct.
+// RuntimeBinding is the synchronously-readable provider/model/runtime
+// selection. BootSpec is the parameterized blueprint that produces boot
+// files, injections, derived vars, and the associated runtime contract.
+//
+// LaunchPlan remains the stable LaunchSpec-equivalent integration view
+// for existing consumers; runtime-critical consumer overlays still win
+// at compile/prepare time.
 package agentlaunch
