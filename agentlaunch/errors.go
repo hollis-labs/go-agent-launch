@@ -250,4 +250,21 @@ var (
 	// contract document cannot be unmarshalled into the contract struct
 	// for its declared kind.
 	ErrRegistryKindDecode = errors.New("agentlaunch: registry contract document failed to decode")
+
+	// ErrRegistryCacheMiss is returned by the degrading registrar wrapper
+	// (S3.4) when the inner registrar is unreachable for a query AND the
+	// last-known-good cache holds no entry for that query. It is the
+	// terminal degradation error: the wrapper served neither a live nor a
+	// cached result. Callers branch on it to distinguish "directory down
+	// but cache covered us" (no error) from "directory down and we never
+	// cached this query" (this error).
+	ErrRegistryCacheMiss = errors.New("agentlaunch: registry degraded and no last-known-good cache entry")
+
+	// ErrRegistryWriteWhileDegraded is returned by the degrading registrar
+	// wrapper (S3.4) when a register or deregister envelope is dispatched
+	// while the inner registrar is unreachable. Writes cannot be served
+	// from the last-known-good cache: the cache is a read-side fallback
+	// only. The error wraps the underlying inner failure so callers can
+	// inspect the root cause with errors.Is / errors.Unwrap.
+	ErrRegistryWriteWhileDegraded = errors.New("agentlaunch: registry write rejected while directory unreachable")
 )
