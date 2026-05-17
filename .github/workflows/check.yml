@@ -1,0 +1,57 @@
+name: check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+          check-latest: true
+
+      - name: go fmt (verify)
+        run: |
+          out=$(gofmt -l .)
+          if [ -n "$out" ]; then
+            echo "Files need gofmt:"
+            echo "$out"
+            exit 1
+          fi
+
+      - name: go vet
+        run: go vet ./...
+
+      - uses: golangci/golangci-lint-action@v7
+        with:
+          version: v2.1.6
+
+      - name: go test -race
+        run: go test -race -count=1 ./...
+
+      # S4.5 cutover gate — old-vs-new launch-plan parity.
+      #
+      # Runs the parity harness over the catalog corpus: every S4.4
+      # LaunchBag is resolved both the legacy static-file way and the new
+      # Spec + LaunchBag way, and the resulting launch-identity plans are
+      # diffed. A diff is acceptable only if it is zero OR a documented
+      # intentional difference (the expected-diff registry); an unexplained
+      # diff fails the build. This step gates S5 (flipping live consumers).
+      #
+      # The harness's fixture corpus is self-contained — no ~/.tether/
+      # install is needed on the runner; the live-catalog check
+      # (TestParity_LiveCatalog) skips cleanly when the catalog is absent.
+      # -v surfaces the full parity summary in the workflow log.
+      - name: parity harness (S4.5 cutover gate)
+        run: go test -race -count=1 -v ./agentlaunch/parity/...
+
+      - name: govulncheck
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./...
