@@ -4,6 +4,36 @@ All notable changes to `go-agent-launch` are documented in this file. Per-releas
 
 ## Unreleased
 
+## v0.3.1 — 2026-05-17
+
+### Fixed
+
+- **`parity`: `resolveNew` no longer fails a launch on var resolution.** The
+  S4.5 parity harness compares launch *identity* — project / work_dir /
+  runner / isolation — which is derived from a launch's INPUTS. But
+  `resolveNew` ran S4.2 var resolution as a mandatory step and hard-failed
+  the whole case when it errored. A spec whose vars use gated `call` / `cmd`
+  sources fail-closes under the offline harness (it configures no
+  `TrustAuthorizer` by design), so every such launch failed parity even
+  though its identity was unaffected — var resolution feeds the boot *body*,
+  which parity does not compare. `resolveNew` now resolves vars best-effort
+  and reads identity off `RenderResult.ResolvedInputs` regardless of the
+  var / template outcome (it also uses the interactive front-end, which
+  reports missing vars rather than hard-erroring). Surfaced by the
+  orchestrator-s5-tether full-corpus parity run, where 60 of 63 launches
+  failed this way once the corpus carried live `call` / `cmd` var sources.
+
+### Notes
+
+- A consumer running a parity corpus wider than the harness's built-in
+  11-entry `Corpus` cannot yet register its own expected-diffs /
+  expected-old-errors — those registries are package-scoped and guarded
+  against entries the built-in corpus does not trip
+  (`TestParity_ExpectedDiffsAreObserved`). Making `RunParity` accept a
+  caller-supplied corpus + expected registries is a tracked follow-up,
+  needed for a full-catalog parity run to reach green.
+- `Version` bumped to v0.3.1.
+
 ## v0.3.0 — 2026-05-17
 
 ### Added — `PlanFromLaunch`: the LaunchSpec → LaunchPlan bridge

@@ -337,21 +337,26 @@ func resolveOld(g *catalog.GlobalCatalog, legacyID string) (NormalizedPlan, erro
 // resolveNew drives the new Spec + LaunchBag resolution path for one bag
 // and projects the result into a NormalizedPlan.
 //
-// The full pipeline, end to end:
+// The pipeline:
 //
 //  1. agentlaunch.LoadLaunchBag loads + validates the bag (S4.4).
 //  2. agentlaunch.ValidateMinimumConfig checks it against the spec (S4.4).
-//  3. VarResolver.ResolveAll resolves the spec's derived vars (S4.2). The
-//     S4.1 renderer does NOT resolve vars — it expects already-resolved
-//     values — so this step is mandatory before Render. The testdata spec's
-//     vars all carry `literal` sources, which resolve offline with no
-//     CallResolver, satisfying the read-only / no-network contract.
-//  4. LaunchSpec.Render runs the S4.1 engine over the bag inputs + resolved
-//     vars (autonomous front-end — a missing required value is a hard
-//     error). This proves the bag renders into a boot body.
+//  3. LaunchSpec.Render runs the S4.1 engine over the bag inputs and projects
+//     launch identity off RenderResult.ResolvedInputs.
 //
-// The NormalizedPlan projection reads launch identity off the resolved
-// inputs.
+// Identity vs. vars — why var resolution is best-effort here. Parity compares
+// launch IDENTITY only — project / work_dir / runner / isolation — and that
+// is derived entirely from the bag's INPUTS. Var resolution (S4.2) and
+// template rendering feed the boot BODY, which parity does not compare. So
+// neither may fail the case: a spec whose vars use gated `call`/`cmd` sources
+// fail-closes under this offline harness (it configures no TrustAuthorizer by
+// design), but the launch's identity is unaffected. resolveNew therefore
+// resolves vars best-effort and reads identity off ResolvedInputs even when
+// Render reports missing vars — Render populates ResolvedInputs regardless of
+// the var/template outcome, and the interactive front-end reports missing
+// vars rather than hard-erroring. (An earlier version ran var resolution as a
+// mandatory step and failed the whole case on a gated source — conflating var
+// resolution with identity resolution.)
 func resolveNew(ctx context.Context, spec agentlaunch.LaunchSpec, bagPath string) (NormalizedPlan, error) {
 	bag, err := agentlaunch.LoadLaunchBag(bagPath)
 	if err != nil {
@@ -361,29 +366,27 @@ func resolveNew(ctx context.Context, spec agentlaunch.LaunchSpec, bagPath string
 		return NormalizedPlan{}, fmt.Errorf("minimum-config: %w", err)
 	}
 
-	// S4.2 var resolution. The spec's vars are session-start prompt-text
-	// sinks with literal sources; resolve them offline (no CallResolver
-	// needed) and feed the resolved values into the render request.
-	vars, err := resolveSpecVars(ctx, spec)
-	if err != nil {
-		return NormalizedPlan{}, fmt.Errorf("var-resolve: %w", err)
-	}
-	req := bag.RenderRequest(agentlaunch.FrontEndAutonomous)
+	req := bag.RenderRequest(agentlaunch.FrontEndInteractive)
 	if req.Vars == nil {
 		req.Vars = map[string]any{}
 	}
-	for name, val := range vars {
-		// A bag-supplied var value wins over the resolver (the bag may
-		// pre-resolve); otherwise take the resolved value.
-		if _, ok := req.Vars[name]; !ok {
-			req.Vars[name] = val
+	// Best-effort var resolution: when the spec's vars resolve (literal/file
+	// sources) feed them in; when they fail-close (gated sources, no
+	// TrustAuthorizer) skip them — identity does not depend on vars.
+	if vars, verr := resolveSpecVars(ctx, spec); verr == nil {
+		for name, val := range vars {
+			if _, ok := req.Vars[name]; !ok {
+				req.Vars[name] = val
+			}
 		}
 	}
 
-	res, err := spec.Render(req)
-	if err != nil {
-		return NormalizedPlan{}, fmt.Errorf("render: %w", err)
-	}
+	// Render error is deliberately tolerated: ResolvedInputs (the identity
+	// source) is populated regardless, and the interactive front-end does
+	// not hard-error on missing vars. A genuine input-shape problem was
+	// already caught by ValidateMinimumConfig above; anything else surfaces
+	// as a parity field diff, not a false green.
+	res, _ := spec.Render(req)
 	return NormalizedPlan{
 		Project:   inputString(res.ResolvedInputs, "project"),
 		WorkDir:   inputString(res.ResolvedInputs, agentlaunch.LaunchInputWorkDir),

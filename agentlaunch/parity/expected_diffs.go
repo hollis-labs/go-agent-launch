@@ -135,6 +135,13 @@ var expectedDiffs = []expectedDiff{
 // a latent defect in the legacy catalog. The S4.4 re-expression folds the
 // agent into the `agent_role` input (web-writer), so the new side resolves
 // cleanly. The old-side failure is expected and documented here.
+//
+// NOTE: this registry is scoped to the harness's own Corpus (the 11-entry
+// S4.4 set) — TestParity_ExpectedDiffsAreObserved rejects an entry the
+// in-corpus old side does not actually trip. A consumer running a WIDER
+// corpus (e.g. Tether's full 64-launch catalog, which surfaces two more
+// dangling-agent launches) cannot register its rationales here; that needs
+// the caller-supplied expected-diffs surface tracked as a follow-up.
 var expectedOldErrors = map[string]string{
 	"hollislabs-web-writer-claude": "hollislabs-web-writer-dangling-agent: legacy launch references agent:web-writer with no agents/web-writer.yaml in the catalog; new bag folds it into the agent_role input",
 }
