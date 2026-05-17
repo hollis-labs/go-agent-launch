@@ -276,4 +276,28 @@ var (
 	// ErrRegistryBusTopicUnknownDirection is returned by BusTopicContract.Validate
 	// when Direction is not one of the declared BusTopicDirection values.
 	ErrRegistryBusTopicUnknownDirection = errors.New("agentlaunch: registry bus topic direction is unknown")
+
+	// ErrRegistryCatalogRootUnreadable is returned by the file-backed
+	// registrar (S3.3) when the catalog root supplied to IngestCatalog
+	// does not exist, is not a directory, or cannot be read. It is the
+	// only failure that aborts an ingest; per-file failures are recorded
+	// in the IngestReport instead.
+	ErrRegistryCatalogRootUnreadable = errors.New("agentlaunch: registry catalog root is unreadable")
+
+	// ErrRegistryCatalogFileUnreadable is returned by the file-backed
+	// registrar (S3.3) when an individual catalog file cannot be read off
+	// disk. It is recorded as a per-file IngestError and does not abort
+	// the ingest.
+	ErrRegistryCatalogFileUnreadable = errors.New("agentlaunch: registry catalog file is unreadable")
+
+	// ErrRegistryCatalogEntryMalformed is returned by the file-backed
+	// registrar (S3.3) when a catalog file is not valid YAML. It is
+	// recorded as a per-file IngestError and does not abort the ingest.
+	ErrRegistryCatalogEntryMalformed = errors.New("agentlaunch: registry catalog entry is malformed")
+
+	// ErrRegistryCatalogEntryMissingID is returned by the file-backed
+	// registrar (S3.3) when a catalog file parses but carries no `id:`
+	// field — the entry has no stable name to register under. It is
+	// recorded as a per-file IngestError and does not abort the ingest.
+	ErrRegistryCatalogEntryMissingID = errors.New("agentlaunch: registry catalog entry has no id")
 )
