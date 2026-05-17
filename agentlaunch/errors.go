@@ -235,4 +235,19 @@ var (
 	// ErrRegistryUnsupportedOperation is returned by the registrar when an
 	// envelope names an operation the live service does not implement.
 	ErrRegistryUnsupportedOperation = errors.New("agentlaunch: registry operation is not supported")
+
+	// ErrRegistryKindSchemaMismatch is returned by per-kind registration
+	// validation when a RegistrationRecord's Meta.SchemaVersion does not
+	// equal the published schema-version constant for its kind.
+	ErrRegistryKindSchemaMismatch = errors.New("agentlaunch: registry record schema version does not match kind")
+
+	// ErrRegistryKindInterfaceMismatch is returned by per-kind registration
+	// validation when a RegistrationRecord's Meta.Interface does not equal
+	// the published interface constant for its kind.
+	ErrRegistryKindInterfaceMismatch = errors.New("agentlaunch: registry record interface does not match kind")
+
+	// ErrRegistryKindDecode is returned by DecodeContract when a raw
+	// contract document cannot be unmarshalled into the contract struct
+	// for its declared kind.
+	ErrRegistryKindDecode = errors.New("agentlaunch: registry contract document failed to decode")
 )
