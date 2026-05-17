@@ -300,4 +300,22 @@ var (
 	// field — the entry has no stable name to register under. It is
 	// recorded as a per-file IngestError and does not abort the ingest.
 	ErrRegistryCatalogEntryMissingID = errors.New("agentlaunch: registry catalog entry has no id")
+
+	// ErrAssemblyMalformedTemplate is returned by the Boot Assembly Spec
+	// engine (S4.1) when an AssemblySpec template body contains a
+	// syntactically invalid merge tag: an unterminated "{{ ... }}", an
+	// empty tag, a tag missing the scope.name form, or an unsafe name.
+	ErrAssemblyMalformedTemplate = errors.New("agentlaunch: assembly template merge tag is malformed")
+
+	// ErrAssemblyUnknownMergeTag is returned by the Boot Assembly Spec
+	// engine (S4.1) when a template merge tag references an input or var
+	// that the embedded BootSpec does not declare.
+	ErrAssemblyUnknownMergeTag = errors.New("agentlaunch: assembly template references an undeclared input or var")
+
+	// ErrAssemblyMissingRequiredInput is returned by AssemblySpec.Render
+	// for the autonomous front-end when a declared-required input has no
+	// supplied value and no default — there is no human to collect it
+	// from. The interactive front-end reports the same condition via
+	// RenderResult.Missing instead of returning this error.
+	ErrAssemblyMissingRequiredInput = errors.New("agentlaunch: assembly render missing required input")
 )
