@@ -4,6 +4,39 @@ All notable changes to `go-agent-launch` are documented in this file. Per-releas
 
 ## Unreleased
 
+## v0.3.3 — 2026-05-17
+
+### Added — permission-posture threading through the bridge
+
+Closes the bridge-review §4.3 value-plumbing gap. §4.3 fixed the *rendering*
+mechanism (the provider `BootDirSpec` emits the approval/permission contract),
+but nothing set the adapter field from a launch's permission posture — so a
+headless claude launched via the spec path planted no `permissions.defaultMode`
+and hung on the first approval prompt (the original CW-20260517-0038 failure,
+re-surfacing on the new path). Surfaced by the orchestrator-s5-tether P5
+validation.
+
+- **`RuntimeBinding.Permission`** and **`ProviderSpec.Permission`** — the
+  spawned agent's permission/approval posture in the provider's own
+  vocabulary: claude `permission_mode` (`default` / `acceptEdits` / `plan` /
+  `bypassPermissions`), codex `approval_policy` (`untrusted` / `on-failure` /
+  `on-request` / `never`).
+- `PlanFromLaunch` carries `RuntimeBinding.Permission` onto
+  `LaunchPlan.Provider.Permission`.
+- `providerplant.DefaultResolver` applies `Provider.Permission` to the
+  resolved go-providers adapter — `ClaudeAdapter.PermissionMode` /
+  `CodexAdapter.ApprovalPolicy` — so the planted boot dir carries the
+  non-interactive approval contract.
+
+Additive: a zero `Permission` preserves prior behavior — codex stays safe via
+go-providers' `never` default; a claude launch with no `Permission` still
+plants no permissions block, so a headless claude runtime-binding must set it
+(`acceptEdits` is the safe non-interactive middle ground).
+
+### Changed
+
+- `Version` bumped to v0.3.3.
+
 ## v0.3.2 — 2026-05-17
 
 ### Added — `ResolveRuntimeBinding`: `runner` → `RuntimeBinding` registry resolver

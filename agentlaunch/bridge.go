@@ -105,6 +105,7 @@ func PlanFromLaunch(in PlanFromLaunchInput) (LaunchPlan, error) {
 			ID:            in.Runtime.Provider,
 			ModelOverride: in.Runtime.Model,
 			Flags:         in.Runtime.Args,
+			Permission:    in.Runtime.Permission,
 		},
 		Runtime: in.Runtime.RuntimeKind,
 		Workspace: WorkspaceSpec{

@@ -39,4 +39,13 @@ type ProviderSpec struct {
 	// overriding the catalog default and any per-agent preference.
 	// Adapter-defined string (e.g. "claude-sonnet-4.5"). Optional.
 	ModelOverride string `yaml:"model_override,omitempty" json:"model_override,omitempty"`
+
+	// Permission is the spawned agent's permission/approval posture in the
+	// provider's own vocabulary (claude permission_mode / codex
+	// approval_policy — see RuntimeBinding.Permission). providerplant's
+	// DefaultResolver applies it to the resolved go-providers adapter
+	// (ClaudeAdapter.PermissionMode / CodexAdapter.ApprovalPolicy) so the
+	// planted boot dir carries the non-interactive approval contract.
+	// PlanFromLaunch sets it from RuntimeBinding.Permission. Optional.
+	Permission string `yaml:"permission,omitempty" json:"permission,omitempty"`
 }

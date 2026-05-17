@@ -48,12 +48,26 @@ func DefaultResolver(compiled *agentlaunch.CompiledLaunch) (provider.BootDirProv
 	}
 	switch desc.BootDirRenderer {
 	case matrix.BootDirRendererClaude:
-		return provider.NewClaudeAdapter(), nil
+		// plan.Provider.Permission carries the launch's permission posture
+		// (claude vocabulary: default/acceptEdits/plan/bypassPermissions).
+		// Threading it onto ClaudeAdapter.PermissionMode is what makes the
+		// planted .claude/settings.json carry permissions.defaultMode — an
+		// empty value leaves a headless claude in interactive mode and it
+		// hangs on the first approval prompt.
+		a := provider.NewClaudeAdapter()
+		a.PermissionMode = plan.Provider.Permission
+		return a, nil
 	case matrix.BootDirRendererCodex:
+		var a *provider.CodexAdapter
 		if plan.Runtime == agentlaunch.RuntimeJsonRpcStdio {
-			return provider.NewCodexAdapterAppServer(), nil
+			a = provider.NewCodexAdapterAppServer()
+		} else {
+			a = provider.NewCodexAdapter()
 		}
-		return provider.NewCodexAdapter(), nil
+		// codex vocabulary: untrusted/on-failure/on-request/never. An empty
+		// value is safe — go-providers defaults ApprovalPolicy to "never".
+		a.ApprovalPolicy = plan.Provider.Permission
+		return a, nil
 	case matrix.BootDirRendererOpencode:
 		return &provider.OpencodeAdapter{Agent: agentName(plan)}, nil
 	default:

@@ -33,6 +33,24 @@ type RuntimeBinding struct {
 	// Timeout is the runtime-side execution timeout as a Go duration
 	// string (for example "30s"). Optional.
 	Timeout string `yaml:"timeout,omitempty" json:"timeout,omitempty"`
+
+	// Permission is the spawned agent's permission/approval posture, in
+	// the provider's OWN vocabulary — interpreted against Provider:
+	//
+	//   - claude → permission_mode (default / acceptEdits / plan /
+	//     bypassPermissions). Empty plants no `permissions.defaultMode`,
+	//     leaving a headless claude in interactive `default` mode — it
+	//     will hang on the first approval prompt. A headless claude
+	//     runtime-binding should set this; acceptEdits is the safe
+	//     non-interactive middle ground.
+	//   - codex  → approval_policy (untrusted / on-failure / on-request /
+	//     never). Empty is safe — go-providers defaults it to `never`.
+	//
+	// Carried verbatim onto LaunchPlan.Provider.Permission by
+	// PlanFromLaunch and applied to the go-providers adapter by
+	// providerplant.DefaultResolver. The adapter validates the value at
+	// boot-dir render time. Optional.
+	Permission string `yaml:"permission,omitempty" json:"permission,omitempty"`
 }
 
 // Validate enforces the frozen RuntimeBinding field contract.

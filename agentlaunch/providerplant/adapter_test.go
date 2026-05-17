@@ -21,6 +21,51 @@ func TestDefaultResolver_Claude(t *testing.T) {
 	}
 }
 
+// TestDefaultResolver_PermissionThreading pins that LaunchPlan.Provider.Permission
+// is applied onto the resolved go-providers adapter — the value plumbing that
+// makes the planted boot dir carry the non-interactive approval contract.
+func TestDefaultResolver_PermissionThreading(t *testing.T) {
+	// claude: Provider.Permission → ClaudeAdapter.PermissionMode.
+	cc := compiledFor(t, "claude", agentlaunch.RuntimePTY)
+	cc.Plan.Provider.Permission = "acceptEdits"
+	a, err := DefaultResolver(cc)
+	if err != nil {
+		t.Fatalf("resolve claude: %v", err)
+	}
+	claude, ok := a.(*provider.ClaudeAdapter)
+	if !ok {
+		t.Fatalf("got %T, want *provider.ClaudeAdapter", a)
+	}
+	if claude.PermissionMode != "acceptEdits" {
+		t.Errorf("ClaudeAdapter.PermissionMode = %q, want acceptEdits", claude.PermissionMode)
+	}
+
+	// codex: Provider.Permission → CodexAdapter.ApprovalPolicy.
+	cx := compiledFor(t, "codex", agentlaunch.RuntimeSubprocess)
+	cx.Plan.Provider.Permission = "on-request"
+	c, err := DefaultResolver(cx)
+	if err != nil {
+		t.Fatalf("resolve codex: %v", err)
+	}
+	codex, ok := c.(*provider.CodexAdapter)
+	if !ok {
+		t.Fatalf("got %T, want *provider.CodexAdapter", c)
+	}
+	if codex.ApprovalPolicy != "on-request" {
+		t.Errorf("CodexAdapter.ApprovalPolicy = %q, want on-request", codex.ApprovalPolicy)
+	}
+
+	// Empty Permission → the adapter field stays empty (claude: the caller
+	// must set it; codex: go-providers defaults ApprovalPolicy to "never").
+	empty, err := DefaultResolver(compiledFor(t, "claude", agentlaunch.RuntimePTY))
+	if err != nil {
+		t.Fatalf("resolve claude (empty permission): %v", err)
+	}
+	if claude2 := empty.(*provider.ClaudeAdapter); claude2.PermissionMode != "" {
+		t.Errorf("empty Provider.Permission: PermissionMode = %q, want empty", claude2.PermissionMode)
+	}
+}
+
 func TestDefaultResolver_CodexExecVsAppServer(t *testing.T) {
 	exec, err := DefaultResolver(compiledFor(t, "codex", agentlaunch.RuntimeSubprocess))
 	if err != nil {
