@@ -20,6 +20,7 @@ const (
 	RegistryKindBootSpec          RegistryKind = "boot-spec"
 	RegistryKindExecutionTemplate RegistryKind = "execution-template"
 	RegistryKindContractObject    RegistryKind = "contract-object"
+	RegistryKindBusTopic          RegistryKind = "bus-topic"
 )
 
 // Valid reports whether k is one of the published registry kinds.
@@ -31,7 +32,8 @@ func (k RegistryKind) Valid() bool {
 		RegistryKindRuntimeBinding,
 		RegistryKindBootSpec,
 		RegistryKindExecutionTemplate,
-		RegistryKindContractObject:
+		RegistryKindContractObject,
+		RegistryKindBusTopic:
 		return true
 	default:
 		return false
@@ -46,6 +48,7 @@ const (
 	BootSpecSchemaVersionV1          = "v1alpha1"
 	ExecutionTemplateSchemaVersionV1 = "v1alpha1"
 	ContractObjectSchemaVersionV1    = "v1alpha1"
+	BusTopicSchemaVersionV1          = "v1alpha1"
 )
 
 const (
@@ -56,6 +59,7 @@ const (
 	BootSpecInterfaceV1          = "boot-spec/v1"
 	ExecutionTemplateInterfaceV1 = "execution-template/v1"
 	ContractObjectInterfaceV1    = "harness-target-file/v1"
+	BusTopicInterfaceV1          = "bus-topic/v1"
 )
 
 // RegistryContract is the common interface every published kind

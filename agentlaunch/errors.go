@@ -235,4 +235,13 @@ var (
 	// ErrRegistryUnsupportedOperation is returned by the registrar when an
 	// envelope names an operation the live service does not implement.
 	ErrRegistryUnsupportedOperation = errors.New("agentlaunch: registry operation is not supported")
+
+	// ErrRegistryBusTopicMissingTopic is returned by BusTopicContract.Validate
+	// when the topic name/address on the bus is empty. The contract is a
+	// handle to a bus topic; without the topic address it is unresolvable.
+	ErrRegistryBusTopicMissingTopic = errors.New("agentlaunch: registry bus topic name is missing")
+
+	// ErrRegistryBusTopicUnknownDirection is returned by BusTopicContract.Validate
+	// when Direction is not one of the declared BusTopicDirection values.
+	ErrRegistryBusTopicUnknownDirection = errors.New("agentlaunch: registry bus topic direction is unknown")
 )
