@@ -22,12 +22,22 @@ package launcher
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/hollis-labs/go-agent-launch/agentlaunch"
 	"github.com/hollis-labs/go-agent-launch/agentlaunch/matrix"
 )
+
+// ErrHeadlessClaudeNeedsPermission is returned by Compile when a claude
+// launch runs in a non-interactive mode (background / ephemeral) with an
+// empty Provider.Permission. Such a launch would boot in claude's
+// interactive `default` permission mode and hang on the first approval
+// prompt with no human attached — Compile rejects it up front rather than
+// producing a launch that is structurally guaranteed to hang. Callers can
+// branch on it (errors.Is) to mark the task blocked-on-misconfiguration.
+var ErrHeadlessClaudeNeedsPermission = errors.New("agentlaunch/compile: headless claude launch requires Provider.Permission")
 
 // CompileOptions tunes the Compile entry point. The zero value is the
 // production default: time.Now for the compile timestamp, empty source
@@ -124,6 +134,19 @@ func Compile(ctx context.Context, plan agentlaunch.LaunchPlan, opts ...CompileOp
 	desc, err := matrix.Lookup(plan.Provider, plan.Runtime)
 	if err != nil {
 		return nil, fmt.Errorf("agentlaunch/compile: %w", err)
+	}
+
+	// Fail-fast: a headless claude launch with no permission posture boots
+	// in claude's interactive `default` mode and hangs on the first tool
+	// approval prompt — there is no one to answer it. Reject it here rather
+	// than emit a CompiledLaunch that is structurally guaranteed to hang.
+	// codex is exempt — go-providers defaults an empty approval_policy to
+	// `never`; an `interactive` launch is exempt — a human can answer.
+	if desc.BootDirRenderer == matrix.BootDirRendererClaude &&
+		plan.Mode != agentlaunch.LaunchInteractive &&
+		plan.Provider.Permission == "" {
+		return nil, fmt.Errorf("%w (launch mode %q): set Provider.Permission to acceptEdits / plan / bypassPermissions",
+			ErrHeadlessClaudeNeedsPermission, plan.Mode)
 	}
 
 	resolved, err := agentlaunch.ResolvePlanPaths(plan)

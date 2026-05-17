@@ -4,6 +4,28 @@ All notable changes to `go-agent-launch` are documented in this file. Per-releas
 
 ## Unreleased
 
+## v0.3.4 — 2026-05-17
+
+### Added — `Compile` rejects a headless claude launch with no permission posture
+
+A claude launch in a non-interactive mode (`background` / `ephemeral`) with an
+empty `Provider.Permission` boots claude in its interactive `default`
+permission mode and hangs on the first approval prompt — no human is attached
+to answer it. v0.3.3 made the permission *threadable*; this makes a launch
+that did not set it **fail fast at compile time** instead of producing a run
+that is structurally guaranteed to hang.
+
+- **`Compile` returns `ErrHeadlessClaudeNeedsPermission`** when a claude
+  launch has `Mode != interactive` and an empty `Provider.Permission`.
+  Callers can `errors.Is` it to mark the task blocked-on-misconfiguration
+  rather than dispatch and retry a doomed run.
+- codex is exempt — go-providers defaults an empty `approval_policy` to
+  `never`. An `interactive` launch is exempt — a human can answer prompts.
+
+### Changed
+
+- `Version` bumped to v0.3.4.
+
 ## v0.3.3 — 2026-05-17
 
 ### Added — permission-posture threading through the bridge

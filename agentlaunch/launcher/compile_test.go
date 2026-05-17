@@ -38,6 +38,43 @@ func validPlanForCompile() agentlaunch.LaunchPlan {
 	}
 }
 
+// TestCompileHeadlessClaudeNeedsPermission pins the fail-fast reject: a
+// claude launch in a non-interactive mode with no Provider.Permission is
+// refused at compile time rather than compiled into a launch that hangs.
+func TestCompileHeadlessClaudeNeedsPermission(t *testing.T) {
+	// background claude, no permission → rejected up front.
+	p := validPlanForCompile()
+	p.Mode = agentlaunch.LaunchBackground
+	if _, err := Compile(context.Background(), p); !errors.Is(err, ErrHeadlessClaudeNeedsPermission) {
+		t.Fatalf("background claude, empty Permission: err = %v, want ErrHeadlessClaudeNeedsPermission", err)
+	}
+
+	// background claude WITH a permission posture → accepted.
+	p = validPlanForCompile()
+	p.Mode = agentlaunch.LaunchBackground
+	p.Provider.Permission = "acceptEdits"
+	if _, err := Compile(context.Background(), p); err != nil {
+		t.Errorf("background claude with Permission set: Compile = %v, want nil", err)
+	}
+
+	// interactive claude, no permission → accepted (a human answers prompts).
+	p = validPlanForCompile()
+	p.Mode = agentlaunch.LaunchInteractive
+	if _, err := Compile(context.Background(), p); err != nil {
+		t.Errorf("interactive claude, empty Permission: Compile = %v, want nil", err)
+	}
+
+	// codex is exempt — go-providers defaults an empty approval_policy to
+	// `never`, so a headless codex with no permission does not hang.
+	p = validPlanForCompile()
+	p.Provider.ID = "codex"
+	p.Runtime = agentlaunch.RuntimeSubprocess
+	p.Mode = agentlaunch.LaunchBackground
+	if _, err := Compile(context.Background(), p); err != nil {
+		t.Errorf("background codex, empty Permission: Compile = %v, want nil (codex is exempt)", err)
+	}
+}
+
 // TestCompileHappyPathDefaultsClaudePty exercises the most common path:
 // claude/pty with an inline boot profile.
 func TestCompileHappyPathDefaultsClaudePty(t *testing.T) {
