@@ -165,6 +165,19 @@ var legalPairs = []entry{
 		bootRenderer: BootDirRendererOpencode,
 		binary:       "opencode",
 	},
+	{
+		// opencode × serve-http: long-lived `opencode serve` child with
+		// HTTP-API attach (go-agent-sessions v0.10.0+ serve_http_session +
+		// go-providers v0.23.0+ NewOpencodeAdapterServeHTTP). Added in
+		// v0.4.0 for V2-pipeline multi-turn opencode workers — Copilot
+		// poll loops, address-the-round revisions, etc. The subprocess
+		// variant above stays for bounded mechanical tasks.
+		provider:     ProviderOpencode,
+		runtime:      agentlaunch.RuntimeServeHTTP,
+		caps:         Capabilities{ServeHTTP: true, BinaryRequired: true},
+		bootRenderer: BootDirRendererOpencode,
+		binary:       "opencode",
+	},
 }
 
 // knownProviders is the lowercased set of provider IDs that appear in

@@ -1,13 +1,13 @@
 package agentlaunch
 
 // RuntimeKind is the typed string enum that names the runtime lifecycle
-// shape a launched session uses. The set mirrors the four runtime kinds
+// shape a launched session uses. The set mirrors the runtime kinds
 // recognised by go-agent-sessions (subprocess-per-turn, PTY,
-// streaming-stdio, JSON-RPC-stdio) so a CompiledLaunch can be translated
-// to a go-agent-sessions StartOptions / Runtime selection without an
-// intermediate string protocol.
+// streaming-stdio, JSON-RPC-stdio, serve-http) so a CompiledLaunch can
+// be translated to a go-agent-sessions StartOptions / Runtime selection
+// without an intermediate string protocol.
 //
-// Valid returns true for the four declared constants only; all other
+// Valid returns true for the five declared constants only; all other
 // values — including the zero value — are rejected by
 // LaunchPlan.Validate via ErrUnknownRuntime.
 //
@@ -37,13 +37,22 @@ const (
 	// speaks JSON-RPC 2.0 over stdin/stdout. Maps to go-agent-sessions's
 	// jsonrpc-stdio runtime.
 	RuntimeJsonRpcStdio RuntimeKind = "jsonrpc-stdio"
+
+	// RuntimeServeHTTP names the long-lived runtime where the child
+	// exposes an HTTP API with server-sent events (opencode `serve`):
+	// go-agent-sessions spawns the child, captures the bound port from
+	// stdout, then attaches via the child's HTTP API for session +
+	// message endpoints. Maps to go-agent-sessions's serve-http runtime
+	// (v0.10.0+ — see serve_http_session.go). Added in v0.4.0 alongside
+	// the opencode long-lived rollout.
+	RuntimeServeHTTP RuntimeKind = "serve-http"
 )
 
-// Valid reports whether the receiver is one of the four declared
+// Valid reports whether the receiver is one of the five declared
 // RuntimeKind constants. The zero value ("") is not valid.
 func (r RuntimeKind) Valid() bool {
 	switch r {
-	case RuntimeSubprocess, RuntimePTY, RuntimeStreamingStdio, RuntimeJsonRpcStdio:
+	case RuntimeSubprocess, RuntimePTY, RuntimeStreamingStdio, RuntimeJsonRpcStdio, RuntimeServeHTTP:
 		return true
 	default:
 		return false
