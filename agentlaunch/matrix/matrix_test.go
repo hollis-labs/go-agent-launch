@@ -242,19 +242,23 @@ func TestLookupBinaryOverrideWhitespace(t *testing.T) {
 	}
 }
 
-// TestSupportedShape verifies Supported() lists exactly the six legal
+// TestSupportedShape verifies Supported() lists exactly the seven legal
 // pairs and that each is reported as supported by IsSupported.
+//
+// opencode/serve-http added in v0.4.0 alongside go-agent-sessions v0.10.0
+// (serve_http_session.go) + go-providers v0.23.0 (NewOpencodeAdapterServeHTTP)
+// for V2-pipeline long-lived opencode workers.
 func TestSupportedShape(t *testing.T) {
 	pairs := Supported()
-	if len(pairs) != 6 {
-		t.Fatalf("Supported() returned %d pairs; want 6", len(pairs))
+	if len(pairs) != 7 {
+		t.Fatalf("Supported() returned %d pairs; want 7", len(pairs))
 	}
 	for _, p := range pairs {
 		if !IsSupported(p.ProviderID, p.Runtime) {
 			t.Errorf("Supported pair %s reported as IsSupported=false", p)
 		}
 	}
-	// Confirm the set is exactly the documented six (order-independent).
+	// Confirm the set is exactly the documented seven (order-independent).
 	want := map[string]bool{
 		"claude/subprocess":      false,
 		"claude/pty":             false,
@@ -262,6 +266,7 @@ func TestSupportedShape(t *testing.T) {
 		"codex/subprocess":       false,
 		"codex/jsonrpc-stdio":    false,
 		"opencode/subprocess":    false,
+		"opencode/serve-http":    false,
 	}
 	for _, p := range pairs {
 		key := p.String()
@@ -348,11 +353,12 @@ func TestKnownProviders(t *testing.T) {
 	}
 }
 
-// TestKnownRuntimes verifies the matrix re-exports the four runtime kinds.
+// TestKnownRuntimes verifies the matrix re-exports the five runtime kinds.
+// serve-http added in v0.4.0.
 func TestKnownRuntimes(t *testing.T) {
 	got := KnownRuntimes()
-	if len(got) != 4 {
-		t.Fatalf("KnownRuntimes() length = %d, want 4", len(got))
+	if len(got) != 5 {
+		t.Fatalf("KnownRuntimes() length = %d, want 5", len(got))
 	}
 	for _, r := range got {
 		if !r.Valid() {

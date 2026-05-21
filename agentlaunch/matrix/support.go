@@ -15,7 +15,7 @@ func KnownProviders() []string {
 	return []string{ProviderClaude, ProviderCodex, ProviderOpencode}
 }
 
-// KnownRuntimes returns the four runtime kinds the matrix accepts (one
+// KnownRuntimes returns the five runtime kinds the matrix accepts (one
 // per agentlaunch.RuntimeKind constant). Note: this is the full set of
 // recognized RuntimeKinds, NOT the set that has at least one legal pair
 // — there is no "isolated runtime" filter here. Callers that want the
@@ -27,5 +27,6 @@ func KnownRuntimes() []agentlaunch.RuntimeKind {
 		agentlaunch.RuntimePTY,
 		agentlaunch.RuntimeStreamingStdio,
 		agentlaunch.RuntimeJsonRpcStdio,
+		agentlaunch.RuntimeServeHTTP,
 	}
 }

@@ -78,6 +78,14 @@ type Capabilities struct {
 	// StreamingStdio.
 	JsonRpcStdio bool
 
+	// ServeHTTP indicates the long-lived non-PTY runtime shape where
+	// the child exposes an HTTP API with server-sent events (opencode
+	// `serve`): the runtime spawns the child, discovers the bound port
+	// from stdout, then attaches via the child's HTTP API for session +
+	// message endpoints. Mutually exclusive with PTY, StreamingStdio,
+	// and JsonRpcStdio.
+	ServeHTTP bool
+
 	// Resize indicates Session.Resize has an observable effect on the
 	// spawned child. Only meaningful when PTY=true; non-PTY runtimes
 	// no-op Resize regardless of this flag.

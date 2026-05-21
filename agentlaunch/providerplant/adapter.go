@@ -69,7 +69,22 @@ func DefaultResolver(compiled *agentlaunch.CompiledLaunch) (provider.BootDirProv
 		a.ApprovalPolicy = plan.Provider.Permission
 		return a, nil
 	case matrix.BootDirRendererOpencode:
-		return &provider.OpencodeAdapter{Agent: agentName(plan)}, nil
+		// opencode has two runtime shapes:
+		//   - subprocess:  one-shot `opencode run --agent <name>` per turn
+		//                  (NewOpencodeAdapter)
+		//   - serve-http:  long-lived `opencode serve` child + HTTP attach
+		//                  (NewOpencodeAdapterServeHTTP, go-providers v0.23.0+)
+		// Both planted BootDirSpecs are identical (same opencode agent file
+		// shape); only the constructor + argv shape differs. Branch here so
+		// the right argv is emitted at Start time.
+		var a *provider.OpencodeAdapter
+		if plan.Runtime == agentlaunch.RuntimeServeHTTP {
+			a = provider.NewOpencodeAdapterServeHTTP()
+		} else {
+			a = provider.NewOpencodeAdapter()
+		}
+		a.Agent = agentName(plan)
+		return a, nil
 	default:
 		return nil, fmt.Errorf("%w: %q", ErrUnknownRenderer, desc.BootDirRenderer)
 	}
