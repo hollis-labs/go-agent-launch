@@ -31,14 +31,15 @@ go test -race -count=1 -v ./agentlaunch/parity/...
 
 CI runs all three. `TestParity_LiveCatalog` resolves against the operator's
 live `~/.tether/catalog`, so it skips where no catalog exists and can go red
-from machine-local catalog edits alone — it is currently red here for that
-reason, tracked as CW-20260905-0048. Everything else passes.
+from machine-local catalog edits alone — see `## Boundaries` for how to read a
+red result.
 
 ## Boundaries
 
 This module was absorbed into `agentkit` as `agentkit/agentlaunch` at agentkit
-v0.1.0 and has not changed since v0.4.0 (2026-05-21). New work belongs in
-`agentkit`.
+v0.1.0, and this repo is maintenance-only. New work belongs in `agentkit`.
+
+`CHANGELOG.md` and the git tags are the authority for what has shipped here.
 
 `matrix/` is the single source of truth for supported provider × runtime pairs.
 An unsupported pair must be refused, never silently defaulted to a working one —
