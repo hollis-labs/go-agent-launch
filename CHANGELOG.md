@@ -4,6 +4,10 @@ All notable changes to `go-agent-launch` are documented in this file. Per-releas
 
 ## Unreleased
 
+### Changed
+
+- Raised the module's `go` directive to `1.26.6` (Go floor across the portfolio); CI now uses `go-version-file: go.mod`.
+
 ## v0.3.5 — 2026-05-17
 
 ### Added — parity-harness extensibility: caller-supplied corpus + expected registries
